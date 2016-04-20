@@ -11,11 +11,14 @@
 #   '+' character indicates that some changes are staged for commit
 #   '$' character indicates that a stash exists
 #   [n<-->n] indicates the number of commits behind and ahead of upstream
-# example usage:
+# usage:
 #   source ~/bin/git-status-prompt/git-status-prompt.sh
-#   PS1="\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;36m\]\w/\[\033[00m\]\[\033[00;32m\]\$(GitStatusPrompt)\[\033[00m\]\n\$ "
+#   PS1="\$(GitStatusPrompt)"
 
 
+readonly PROMPT_HEAD='\033[01;32m'$USER@$HOSTNAME'\033[00m:\033[01;36m'
+readonly PROMPT_MID='\033[00m\033[00;32m'
+readonly PROMPT_TAIL='\033[00m\n$ '
 readonly DIRTY_CHAR="*"
 readonly TRACKED_CHAR="!"
 readonly UNTRACKED_CHAR="?"
@@ -37,6 +40,7 @@ readonly BEHIND_COLOR=$RED
 readonly AHEAD_COLOR=$YELLOW
 readonly EVEN_COLOR=$GREEN
 readonly ANSI_FILTER_REGEX="s/\\\033\[([0-9]{1,2}(;[0-9]{1,2})?)?m//g"
+readonly TIMESTAMP_LEN=10
 
 
 # helpers
@@ -84,10 +88,7 @@ function SyncStatus
   [ $(($?)) -eq 0 ] && echo $status
 }
 
-
-# main entry point
-
-function GitStatusPrompt
+function GitStatus
 {
   # ensure we are in a valid git repository with commits
   [ ! $(AssertIsValidRepo) ]                        && return
@@ -99,7 +100,7 @@ function GitStatusPrompt
   while read local_branch remote_branch
   do
     # filter branches by name
-    [ "$current_branch" == "$local_branch" ] || continue
+    [ "$current_branch" != "$local_branch" ] && continue
 
     # set branch color based on dirty status
     if [ -z "$(HasAnyChanges)" ] ; then branch_color=$CLEAN_COLOR ; else branch_color=$DIRTY_COLOR ; fi ;
@@ -128,6 +129,7 @@ function GitStatusPrompt
     stashed=$(HasStashedChanges)
 
     # build output
+    current_dir="$(pwd)"
     open_paren="$branch_color($END"
     close_paren="$branch_color)$END"
     open_bracket="$branch_color[$END"
@@ -144,16 +146,28 @@ function GitStatusPrompt
     branch_status_msg=$open_paren$branch_msg$status_msg$upstream_msg$close_paren
 
     # append last commit message trunctuated to console width
-    current_dir=$(pwd)
-    status_msg_filtered=$(echo $branch_status_msg | sed -r $ANSI_FILTER_REGEX --)
+    status_msg=$(echo $branch_status_msg | sed -r $ANSI_FILTER_REGEX --)
     author_date=$(git log -n 1 --format=format:"%ai" $1 2> /dev/null)
-    commit_msg=$(git log -n 1 --format=format:\"%s\" | sed -r "s/\"//g")
+    commit_log=$( git log -n 1 --format=format:\"%s\" | sed -r "s/\"//g")
+    commit_msg=" ${author_date:0:TIMESTAMP_LEN} $commit_log"
     current_tty_w=$(($(stty -F /dev/tty size | cut -d ' ' -f2)))
-    prompt_len=$((${#USER} + 1 + ${#HOSTNAME} + 1 + ${#current_dir}))
-    status_msg_len=${#status_msg_filtered}
-    timestamp_len=10
-    n_chars=$(($current_tty_w - $prompt_len - $status_msg_len - $timestamp_len - 4))
-    echo -e "$branch_status_msg ${author_date:0:10} ${commit_msg:0:$n_chars}"
+    prompt_msg_len=$((${#USER} + 1 + ${#HOSTNAME} + 1 + ${#current_dir} + 1 + ${#status_msg}))
+    prompt_msg_mod=$(($prompt_msg_len % $current_tty_w))
+    commit_msg_len=$(($current_tty_w - $prompt_msg_mod))
+    min_len=$(($TIMESTAMP_LEN + 1))
+    max_len=$(($current_tty_w - 1))
+    [ $commit_msg_len -lt $min_len -o $commit_msg_len -gt $max_len ] && commit_msg_len=0
+    commit_msg=${commit_msg:0:commit_msg_len}
+
+    echo "$branch_status_msg$commit_msg"
 
   done < <(git for-each-ref --format="%(refname:short) %(upstream:short)" refs/heads)
+}
+
+
+# main entry point
+
+function GitStatusPrompt
+{
+  echo -e "$PROMPT_HEAD$(pwd)/$PROMPT_MID$(GitStatus)$PROMPT_TAIL"
 }
