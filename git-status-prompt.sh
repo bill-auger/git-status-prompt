@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # git-status-prompt.sh
-# Copyright 2013-2016 http://github.com/bill-auger
+# Copyright 2013-2016 bill-auger <http://github.com/bill-auger/git-status-prompt/issues>
 
 # this script formats git branch name plus dirty and sync status for appending to bash prompt
 # format is: (branch-name status-indicators [divergence]) last-commit-message
@@ -96,7 +96,21 @@ function GitStatus
 
   current_branch=`git rev-parse --abbrev-ref HEAD` ; [ $current_branch ] || return ;
 
-  # loop over all branches
+  # detect detached HEAD state and abort
+  if   [ -f $(pwd)/.git/MERGE_HEAD    ] && [ ! -z "`cat .git/MERGE_MSG | grep -E '^Merge'`" ]
+  then merge_msg=`cat .git/MERGE_MSG | grep -E "^Merge (.*)branch '"            | \
+                  sed -e "s/^Merge \(.*\)branch '\(.*\)' into \(.*\)$/\2 into \3/"`
+       echo "$UNTRACKED_COLOR(merging $merge_msg)$END"  ; return ;
+  elif [ -d $(pwd)/.git/rebase-apply/ ] || [ -d $(pwd)/.git/rebase-merge/ ]
+  then rebase_dir=`ls -d .git/rebase-* | sed -e "s/^.git\/rebase-\(.*\)$/.git\/rebase-\1/"`
+       this_branch=`cat $rebase_dir/head-name | sed -e "s/^refs\/heads\/\(.*\)$/\1/"`
+       their_commit=`cat $rebase_dir/onto`
+       echo "$UNTRACKED_COLOR(rebasing $this_branch onto $their_commit)$END" ; return ;
+  elif [ "$current_branch" == "HEAD" ]
+  then echo "$UNTRACKED_COLOR(detached)$END" ; return ;
+  fi
+
+  # loop over all branches to find remote tracking branch
   while read local_branch remote_branch
   do
     # filter branches by name
