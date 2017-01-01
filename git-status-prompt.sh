@@ -16,20 +16,23 @@
 #   PS1="\$(GitStatusPrompt)"
 
 
-readonly PROMPT_HEAD='\033[01;32m'$USER@$HOSTNAME'\033[00m:\033[01;36m'
-readonly PROMPT_MID='\033[00m\033[00;32m'
-readonly PROMPT_TAIL='\033[00m\n$ '
+readonly RED='\033[1;31m'
+readonly YELLOW='\033[01;33m'
+readonly GREEN='\033[00;32m'
+readonly LIME='\033[01;32m'
+readonly PURPLE='\033[00;35m'
+readonly BLUE='\033[00;36m'
+readonly AQUA='\033[01;36m'
+readonly END='\033[00m'
+readonly PROMPT_HEAD=$PURPLE$USER@$HOSTNAME$END':'$BLUE
+readonly PROMPT_MID=$END$GREEN
+readonly PROMPT_TAIL=$END'\n$ '
 readonly DIRTY_CHAR="*"
 readonly TRACKED_CHAR="!"
 readonly UNTRACKED_CHAR="?"
 readonly STAGED_CHAR="+"
 readonly STASHED_CHAR="$"
 readonly GIT_CLEAN_MSG_REGEX="nothing to commit,? (?working directory clean)?"
-readonly GREEN='\033[0;32m'
-readonly LIME='\033[1;32m'
-readonly YELLOW='\033[1;33m'
-readonly RED='\033[1;31m'
-readonly END='\033[0m'
 readonly CLEAN_COLOR=$GREEN
 readonly DIRTY_COLOR=$YELLOW
 readonly TRACKED_COLOR=$YELLOW
@@ -97,11 +100,11 @@ function GitStatus
   current_branch=`git rev-parse --abbrev-ref HEAD` ; [ $current_branch ] || return ;
 
   # detect detached HEAD state and abort
-  if   [ -f $(pwd)/.git/MERGE_HEAD    ] && [ ! -z "`cat .git/MERGE_MSG | grep -E '^Merge'`" ]
+  if   [ -f "$(pwd)/.git/MERGE_HEAD"    ] && [ ! -z "`cat .git/MERGE_MSG | grep -E '^Merge'`" ]
   then merge_msg=`cat .git/MERGE_MSG | grep -E "^Merge (.*)(branch|tag|commit) '"               | \
                   sed -e "s/^Merge \(.*\)\(branch\|tag\|commit\) '\(.*\)'\( into .*\)\?$/ \3\4/"`
        echo "$UNTRACKED_COLOR(merging$merge_msg)$END"  ; return ;
-  elif [ -d $(pwd)/.git/rebase-apply/ ] || [ -d $(pwd)/.git/rebase-merge/ ]
+  elif [ -d "$(pwd)/.git/rebase-apply/" ] || [ -d "$(pwd)/.git/rebase-merge/"                 ]
   then rebase_dir=`ls -d .git/rebase-* | sed -e "s/^.git\/rebase-\(.*\)$/.git\/rebase-\1/"`
        this_branch=`cat $rebase_dir/head-name | sed -e "s/^refs\/heads\/\(.*\)$/\1/"`
        their_commit=`cat $rebase_dir/onto`
