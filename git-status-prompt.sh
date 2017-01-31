@@ -1,18 +1,35 @@
 #!/bin/bash
 
-# git-status-prompt.sh
-# Copyright 2013-2016 bill-auger <http://github.com/bill-auger/git-status-prompt/issues>
 
-# this script formats git branch name plus dirty and sync status for appending to bash prompt
-# format is: (branch-name status-indicators [divergence]) last-commit-message
-#   '*' character indicates that the working tree differs from HEAD
-#   '!' character indicates that some tracked files have changed
-#   '?' character indicates that some new or untracked files exist
-#   '+' character indicates that some changes are staged for commit
-#   '$' character indicates that a stash exists
-#   [n<-->n] indicates the number of commits behind and ahead of upstream
-# usage:
-#   source ~/bin/git-status-prompt/git-status-prompt.sh
+# git-status-prompt.sh - pretty format git sync and dirty status for shell prompt
+# Copyright 2013-2017 bill-auger <http://github.com/bill-auger/git-status-prompt/issues>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+
+# FORMAT:
+#   (branch-name status-indicators [divergence]) last-commit-date last-commit-message
+#     where:
+#       '*' character indicates that the working tree differs from HEAD (per .gitignore)
+#       '!' character indicates that some tracked files have changed
+#       '?' character indicates that some new or untracked files exist
+#       '+' character indicates that some changes are staged for commit
+#       '$' character indicates that a stash exists
+#       [n<-->n] indicates the number of commits behind and ahead of upstream
+#
+# USAGE:
+#   source /path/to/git-status-prompt/git-status-prompt.sh
 #   PS1="\$(GitStatusPrompt)"
 
 
