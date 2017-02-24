@@ -119,7 +119,8 @@ function GitStatus
   # detect detached HEAD state and abort
   if   [ -f "$(pwd)/.git/MERGE_HEAD"    ] && [ ! -z "`cat .git/MERGE_MSG | grep -E '^Merge'`" ]
   then merge_msg=`cat .git/MERGE_MSG | grep -E "^Merge (.*)(branch|tag|commit) '"               | \
-                  sed -e "s/^Merge \(.*\)\(branch\|tag\|commit\) '\(.*\)'\( into .*\)\?$/ \3\4/"`
+                  sed -e "s/^Merge \(.*\)\(branch\|tag\|commit\) '\(.*\)' \(of .* \)\?\(into .*\)\?$/\1 \2 \3 \4\5/"`
+
        echo "$UNTRACKED_COLOR(merging$merge_msg)$END"  ; return ;
   elif [ -d "$(pwd)/.git/rebase-apply/" ] || [ -d "$(pwd)/.git/rebase-merge/"                 ]
   then rebase_dir=`ls -d .git/rebase-* | sed -e "s/^.git\/rebase-\(.*\)$/.git\/rebase-\1/"`
