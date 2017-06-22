@@ -1,6 +1,5 @@
 #!/bin/bash
 
-
 # git-status-prompt.sh - pretty format git sync and dirty status for shell prompt
 # Copyright 2013-2017 bill-auger <http://github.com/bill-auger/git-status-prompt/issues>
 #
@@ -41,7 +40,8 @@ readonly PURPLE='\033[00;35m'
 readonly BLUE='\033[00;36m'
 readonly AQUA='\033[01;36m'
 readonly END='\033[00m'
-readonly PROMPT_HEAD=$PURPLE$USER@$HOSTNAME$END':'$BLUE
+mkdir /deleteme 2> /dev/null && rmdir /deleteme/ && LOGIN_COLOR=$RED || LOGIN_COLOR=$PURPLE
+readonly PROMPT_HEAD=$LOGIN_COLOR`whoami`@$HOSTNAME$END':'$BLUE
 readonly PROMPT_MID=$END$GREEN
 readonly PROMPT_TAIL=$END'\n$ '
 readonly DIRTY_CHAR="*"
