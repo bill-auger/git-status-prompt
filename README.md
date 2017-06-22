@@ -1,4 +1,4 @@
-git-status-prompt.sh - pretty format git sync and dirty status for shell prompt
+### git-status-prompt.sh - pretty format git sync and dirty status for shell prompt
 
 ![git-status-prompt screenshot][scrot]
 
