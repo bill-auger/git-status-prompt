@@ -39,11 +39,8 @@ readonly LIME='\033[01;32m'
 readonly PURPLE='\033[00;35m'
 readonly BLUE='\033[00;36m'
 readonly AQUA='\033[01;36m'
-readonly END='\033[00m'
+readonly CEND='\033[00m'
 mkdir /deleteme 2> /dev/null && rmdir /deleteme/ && LOGIN_COLOR=$RED || LOGIN_COLOR=$PURPLE
-readonly PROMPT_HEAD=$LOGIN_COLOR`whoami`@$HOSTNAME$END':'$BLUE
-readonly PROMPT_MID=$END$GREEN
-readonly PROMPT_TAIL=$END'\n$ '
 readonly DIRTY_CHAR="*"
 readonly TRACKED_CHAR="!"
 readonly UNTRACKED_CHAR="?"
@@ -121,14 +118,14 @@ function GitStatus
   then merge_msg=`cat .git/MERGE_MSG | grep -E "^Merge (.*)(branch|tag|commit) '"               | \
                   sed -e "s/^Merge \(.*\)\(branch\|tag\|commit\) '\(.*\)' \(of .* \)\?\(into .*\)\?$/\1 \2 \3 \4\5/"`
 
-       echo "$UNTRACKED_COLOR(merging$merge_msg)$END"  ; return ;
+       echo "$UNTRACKED_COLOR(merging$merge_msg)$CEND" ; return ;
   elif [ -d "$(pwd)/.git/rebase-apply/" ] || [ -d "$(pwd)/.git/rebase-merge/"                 ]
   then rebase_dir=`ls -d .git/rebase-* | sed -e "s/^.git\/rebase-\(.*\)$/.git\/rebase-\1/"`
        this_branch=`cat $rebase_dir/head-name | sed -e "s/^refs\/heads\/\(.*\)$/\1/"`
        their_commit=`cat $rebase_dir/onto`
-       echo "$UNTRACKED_COLOR(rebasing $this_branch onto $their_commit)$END" ; return ;
+       echo "$UNTRACKED_COLOR(rebasing $this_branch onto $their_commit)$CEND" ; return ;
   elif [ "$current_branch" == "HEAD" ]
-  then echo "$UNTRACKED_COLOR(detached)$END" ; return ;
+  then echo "$UNTRACKED_COLOR(detached)$CEND" ; return ;
   fi
 
   # loop over all branches to find remote tracking branch
@@ -165,18 +162,18 @@ function GitStatus
 
     # build output
     current_dir="$(pwd)"
-    open_paren="$branch_color($END"
-    close_paren="$branch_color)$END"
-    open_bracket="$branch_color[$END"
-    close_bracket="$branch_color]$END"
-    tracked_msg=$TRACKED_COLOR$tracked$END
-    untracked_msg=$UNTRACKED_COLOR$untracked$END
-    staged_msg=$STAGED_COLOR$staged$END
-    stashed_msg=$STASHED_COLOR$stashed$END
-    branch_msg=$branch_color$current_branch$END
+    open_paren="$branch_color($CEND"
+    close_paren="$branch_color)$CEND"
+    open_bracket="$branch_color[$CEND"
+    close_bracket="$branch_color]$CEND"
+    tracked_msg=$TRACKED_COLOR$tracked$CEND
+    untracked_msg=$UNTRACKED_COLOR$untracked$CEND
+    staged_msg=$STAGED_COLOR$staged$CEND
+    stashed_msg=$STASHED_COLOR$stashed$CEND
+    branch_msg=$branch_color$current_branch$CEND
     status_msg=$stashed_msg$untracked_msg$tracked_msg$staged_msg
-    [ $remote_branch ] && behind_msg="$behind_color$n_behind<-$END"
-    [ $remote_branch ] && ahead_msg="$ahead_color->$n_ahead$END"
+    [ $remote_branch ] && behind_msg="$behind_color$n_behind<-$CEND"
+    [ $remote_branch ] && ahead_msg="$ahead_color->$n_ahead$CEND"
     [ $remote_branch ] && upstream_msg=$open_bracket$behind_msg$ahead_msg$close_bracket
     branch_status_msg=$open_paren$branch_msg$status_msg$upstream_msg$close_paren
 
@@ -204,5 +201,10 @@ function GitStatus
 
 function GitStatusPrompt
 {
-  echo -e "$PROMPT_HEAD$(pwd)/$PROMPT_MID$(GitStatus)$PROMPT_TAIL"
+  login_host="$LOGIN_COLOR`whoami`@$HOSTNAME$CEND:"
+  pwd_path="$BLUE$PWD/$CEND"
+  git_status="$GREEN$(GitStatus)$CEND"
+  prompt_tail='\n$ '
+
+  echo -e "$login_host $pwd_path$git_status$prompt_tail"
 }
