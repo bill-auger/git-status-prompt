@@ -125,7 +125,8 @@ function GitStatus
   then rebase_dir=`ls -d $git_dir/rebase-* | sed -e "s/^\$\(git_dir\)\/rebase-\(.*\)$/\$\(git_dir\)\/rebase-\1/"`
        this_branch=`cat $rebase_dir/head-name | sed -e "s/^refs\/heads\/\(.*\)$/\1/"`
        their_commit=`cat $rebase_dir/onto`
-       echo "$UNTRACKED_COLOR(rebasing $this_branch onto $their_commit)$CEND" ; return ;
+       at_commit=`git log -n1 --oneline $(cat $rebase_dir/stopped-sha)`
+       echo "$UNTRACKED_COLOR(rebasing $this_branch onto ${their_commit::7} - at $at_commit)$CEND" ; return ;
   elif [ "$current_branch" == "HEAD" ]
   then echo "$UNTRACKED_COLOR(detached)$CEND" ; return ;
   fi
@@ -183,6 +184,7 @@ function GitStatus
     status_msg=$(echo $branch_status_msg | sed -r $ANSI_FILTER_REGEX --)
     author_date=$(git log -n 1 --format=format:"%ai" $1 2> /dev/null)
     commit_log=$( git log -n 1 --format=format:\"%s\" | sed -r "s/\"//g")
+    [ "$commit_log" ] || commit_log='<EMPTY>'
     commit_msg=" ${author_date:0:TIMESTAMP_LEN} $commit_log"
     current_tty_w=$(($(stty -F /dev/tty size | cut -d ' ' -f2)))
     prompt_msg_len=$((${#USER} + 1 + ${#HOSTNAME} + 2 + ${#current_dir} + 1 + ${#status_msg}))
@@ -192,7 +194,6 @@ function GitStatus
     max_len=$(($current_tty_w - 1))
     [ $commit_msg_len -lt $min_len -o $commit_msg_len -gt $max_len ] && commit_msg_len=0
     commit_msg=${commit_msg:0:commit_msg_len}
-
     echo "$branch_status_msg$commit_msg"
 
   done < <(git for-each-ref --format="%(refname:short) %(upstream:short)" refs/heads)
