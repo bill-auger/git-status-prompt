@@ -125,7 +125,7 @@ function GitStatus
   then rebase_dir=`ls -d $git_dir/rebase-* | sed -e "s/^\$\(git_dir\)\/rebase-\(.*\)$/\$\(git_dir\)\/rebase-\1/"`
        this_branch=`cat $rebase_dir/head-name | sed -e "s/^refs\/heads\/\(.*\)$/\1/"`
        their_commit=`cat $rebase_dir/onto`
-       at_commit=`git log -n1 --oneline $(cat $rebase_dir/stopped-sha)`
+       at_commit=`git log -n1 --oneline $(cat $rebase_dir/stopped-sha 2> /dev/null)`
        echo "$UNTRACKED_COLOR(rebasing $this_branch onto ${their_commit::7} - at $at_commit)$CEND" ; return ;
   elif [ "$current_branch" == "HEAD" ]
   then echo "$UNTRACKED_COLOR(detached)$CEND" ; return ;
