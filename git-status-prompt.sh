@@ -40,7 +40,7 @@ readonly PURPLE='\033[00;35m'
 readonly BLUE='\033[00;36m'
 readonly AQUA='\033[01;36m'
 readonly CEND='\033[00m'
-mkdir /deleteme 2> /dev/null && rmdir /deleteme/ && LOGIN_COLOR=$RED || LOGIN_COLOR=$PURPLE
+(($EUID)) && readonly LOGIN_COLOR=$PURPLE || readonly LOGIN_COLOR=$RED
 readonly DIRTY_CHAR="*"
 readonly TRACKED_CHAR="!"
 readonly UNTRACKED_CHAR="?"
@@ -105,6 +105,8 @@ function SyncStatus
   [ $(($?)) -eq 0 ] && echo $status
 }
 
+function CurrentDir { local pwd="${PWD}/" ; echo "${pwd/\/\//\/}" ; }
+
 function GitStatus
 {
   # ensure we are in a valid git repository with commits
@@ -164,7 +166,7 @@ function GitStatus
     stashed=$(HasStashedChanges)
 
     # build output
-    current_dir="$(pwd)"
+    current_dir=$(CurrentDir)
     open_paren="$branch_color($CEND"
     close_paren="$branch_color)$CEND"
     open_bracket="$branch_color[$CEND"
@@ -204,9 +206,9 @@ function GitStatus
 
 function GitStatusPrompt
 {
-  login_host="$LOGIN_COLOR`whoami`@$HOSTNAME$CEND:"
-  pwd_path="$BLUE$PWD/$CEND"
-  git_status="$GREEN$(GitStatus)$CEND"
+  login_host="${LOGIN_COLOR}${USER}@${HOSTNAME}${CEND}:"
+  pwd_path="${BLUE}$(CurrentDir)${CEND}"
+  git_status="${GREEN}$(GitStatus)${CEND}"
   prompt_tail='\n$ '
 
   echo -e "$login_host $pwd_path$git_status$prompt_tail"
