@@ -64,13 +64,19 @@ readonly TIMESTAMP_LEN=10
 
 function AssertIsValidRepo
 {
-  git rev-parse --is-inside-work-tree > /dev/null 2>&1 && echo "OK"
+  [ "`git rev-parse --is-inside-work-tree 2> /dev/null`" == 'true' ] || \
+  ! (($(AssertIsNotBareRepo)))                                       && echo 1 || echo 0
 }
 
 function AssertHasCommits
 {
   # TODO: does this fail if detached HEAD ?
-  git cat-file -t HEAD > /dev/null 2>&1 && echo "OK"
+  [ "`git cat-file -t HEAD 2> /dev/null`" ] && echo 1 || echo 0
+}
+
+function AssertIsNotBareRepo
+{
+  [ "`git rev-parse --is-bare-repository 2> /dev/null`" != 'true' ] && echo 1 || echo 0
 }
 
 function HasAnyChanges
@@ -109,9 +115,10 @@ function CurrentDir { local pwd="${PWD}/" ; echo "${pwd/\/\//\/}" ; }
 
 function GitStatus
 {
-  # ensure we are in a valid git repository with commits
-  [ ! $(AssertIsValidRepo) ]                        && return
-  [ ! $(AssertHasCommits)  ] && echo "(no commits)" && return
+  # ensure we are in a valid, non-bare git repository with commits
+  ! (($(AssertIsValidRepo  )))                        && return
+  ! (($(AssertIsNotBareRepo))) && echo "(bare repo)"  && return
+  ! (($(AssertHasCommits   ))) && echo "(no commits)" && return
 
   # get the current state
   git_dir=`git rev-parse --show-toplevel`/.git     ; [ "$git_dir"        ] || return ;
