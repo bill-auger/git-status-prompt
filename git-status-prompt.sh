@@ -40,7 +40,6 @@ readonly PURPLE='\033[00;35m'
 readonly BLUE='\033[00;36m'
 readonly AQUA='\033[01;36m'
 readonly CEND='\033[00m'
-(($EUID)) && readonly LOGIN_COLOR=$PURPLE || readonly LOGIN_COLOR=$RED
 readonly DIRTY_CHAR="*"
 readonly TRACKED_CHAR="!"
 readonly UNTRACKED_CHAR="?"
@@ -56,6 +55,9 @@ readonly STASHED_COLOR=$LIME
 readonly BEHIND_COLOR=$RED
 readonly AHEAD_COLOR=$YELLOW
 readonly EVEN_COLOR=$GREEN
+readonly ROOT_COLOR=$RED
+readonly USER_COLOR=$PURPLE
+readonly LOGIN=$(whoami)
 readonly ANSI_FILTER_REGEX="s/\\\033\[([0-9]{1,2}(;[0-9]{1,2})?)?m//g"
 readonly TIMESTAMP_LEN=10
 
@@ -109,6 +111,14 @@ function SyncStatus
   local_branch=$1 ; remote_branch=$2 ;
   status=`git rev-list --left-right ${local_branch}...${remote_branch} -- 2>/dev/null`
   [ $(($?)) -eq 0 ] && echo $status
+}
+
+function LoginColor { (( $EUID )) && echo $USER_COLOR || echo $ROOT_COLOR ; }
+
+function LoginHost
+{
+  [ -z "$STY" ] && echo "${USER}@${HOSTNAME}${CEND}:"   || \
+                   echo "[${USER}@${HOSTNAME}]${CEND}:" # GNU screen
 }
 
 function CurrentDir { local pwd="${PWD}/" ; echo "${pwd/\/\//\/}" ; }
@@ -208,10 +218,11 @@ function TruncateToWidth
   commit_msg=$2
 
   # trunctuate to console width
+  login_host=$(LoginHost | sed -r $ANSI_FILTER_REGEX --)
   current_dir=$(CurrentDir)
   status_msg=$(echo $branch_status_msg | sed -r $ANSI_FILTER_REGEX --)
   current_tty_w=$(($(stty -F /dev/tty size | cut -d ' ' -f2)))
-  prompt_msg_len=$((${#USER} + 1 + ${#HOSTNAME} + 1 + ${#current_dir} + 1 + ${#status_msg}))
+  prompt_msg_len=$((${#login_host} + 1 + ${#current_dir} + 1 + ${#status_msg}))
   prompt_msg_mod=$(($prompt_msg_len % $current_tty_w))
   commit_msg_len=$(($current_tty_w - $prompt_msg_mod))
   min_len=$(($TIMESTAMP_LEN + 1))
@@ -226,7 +237,7 @@ function TruncateToWidth
 
 function GitStatusPrompt
 {
-  login_host="${LOGIN_COLOR}${USER}@${HOSTNAME}${CEND}:"
+  login_host="$(LoginColor)$(LoginHost)${CEND}"
   pwd_path="${BLUE}$(CurrentDir)${CEND}"
   git_status="${GREEN}$(GitStatus)${CEND}"
   prompt_tail='\n$ '
