@@ -17,6 +17,9 @@ USAGE:
   # ~/.bashrc
   source /path/to/git-status-prompt/git-status-prompt.sh
   PS1="\$(GitStatusPrompt)"
+
+  # this script can be sluggish in repos with a large number of commits
+  # such directories may be listed in a file named 'ignore_dirs' to avoid processing
 ```
 
 

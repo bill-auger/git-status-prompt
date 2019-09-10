@@ -32,6 +32,10 @@
 #   PS1="\$(GitStatusPrompt)"
 
 
+# this script can be sluggish in very large repos
+declare -r -a IGNORED_DIRS=( $(grep -v ^# ignore_dirs 2> /dev/null) )
+
+
 readonly RED='\033[1;31m'
 readonly YELLOW='\033[01;33m'
 readonly GREEN='\033[00;32m'
@@ -63,6 +67,17 @@ readonly TIMESTAMP_LEN=10
 
 
 # helpers
+
+function AssertIsNotIgnoredDir
+{
+  local ignored_dir
+
+  for  ignored_dir in ${IGNORED_DIRS[*]}
+  do   [[ "$(pwd)" =~ ^${ignored_dir} ]] && echo 0
+  done
+
+  echo 1
+}
 
 function AssertIsValidRepo
 {
@@ -125,10 +140,11 @@ function CurrentDir { local pwd="${PWD}/" ; echo "${pwd/\/\//\/}" ; }
 
 function GitStatus
 {
-  # ensure we are in a valid, non-bare git repository with commits
-  ! (($(AssertIsValidRepo  )))                                              && return
-  ! (($(AssertIsNotBareRepo))) && echo $(TruncateToWidth "" "(bare repo)" ) && return
-  ! (($(AssertHasCommits   ))) && echo $(TruncateToWidth "" "(no commits)") && return
+  # ensure we are in a valid, non-bare git repository, with commits, and not blacklisted
+  ! (($(AssertIsValidRepo    )))                                              && return
+  ! (($(AssertIsNotBareRepo  ))) && echo $(TruncateToWidth "" "(bare repo)" ) && return
+  ! (($(AssertHasCommits     ))) && echo $(TruncateToWidth "" "(no commits)") && return
+  ! (($(AssertIsNotIgnoredDir))) && echo $(TruncateToWidth "" "(heavy-git)" ) && return
 
   # get the current state
   git_dir=`git rev-parse --show-toplevel`/.git     ; [ "$git_dir"        ] || return ;
