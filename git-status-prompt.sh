@@ -92,7 +92,45 @@ AssertIsNotBareRepo()
 AssertHasCommits()
 {
   # TODO: does this fail if detached HEAD ?
-  [[ "$(git cat-file -t HEAD 2> /dev/null)" ]]
+  [[ -n "$(git cat-file -t HEAD 2> /dev/null)" ]]
+}
+
+GitDir() { echo "$(git rev-parse --show-toplevel  )/.git" ; }
+
+CurrentBranch() { git rev-parse --abbrev-ref HEAD ; }
+
+DetachedMsg() # (git_dir current_branch)
+{
+  local git_dir=$1
+  local current_branch=$2
+
+  [[ -n "${git_dir}" ]] || return ;
+
+  if   [[ -f "${git_dir}/MERGE_HEAD" && ! -z "$(cat ${git_dir}/MERGE_MSG | grep -E '^Merge')" ]]
+  then local merge_msg=$(cat ${git_dir}/MERGE_MSG | grep -E "^Merge (.*)(branch|tag|commit) '"                             | \
+                         sed -e "s/^Merge \(.*\)\(branch\|tag\|commit\) '\(.*\)' \(of .* \)\?\(into .*\)\?$/\1 \2 \3 \4\5/")
+
+       echo "${UNTRACKED_COLOR}$(TruncateToWidth "" "(merging ${merge_msg})")${CEND}"
+
+  elif [[ -d "${git_dir}/rebase-apply/" || -d "${git_dir}/rebase-merge/" ]]
+  then local rebase_dir=$(  ls -d ${git_dir}/rebase-* | sed -e "s/^\$\(git_dir\)\/rebase-\(.*\)$/\$\(git_dir\)\/rebase-\1/")
+       local this_branch=$( cat ${rebase_dir}/head-name | sed -e "s/^refs\/heads\/\(.*\)$/\1/" )
+       local their_commit=$(cat ${rebase_dir}/onto                                             )
+       local at_commit=$(   git log -n1 --oneline $(cat ${rebase_dir}/stopped-sha 2> /dev/null))
+       local msg="(rebasing ${this_branch} onto ${their_commit::7} - at ${at_commit})"
+
+       echo "${UNTRACKED_COLOR}$(TruncateToWidth "" "${msg}" )${CEND}"
+
+  elif [[ "${current_branch}" == "HEAD" ]]
+  then echo "${UNTRACKED_COLOR}$(TruncateToWidth "" "(detached)")${CEND}"
+  fi
+}
+
+IsLocalBranch() # (branch_name)
+{
+  local branch=$1
+
+  [[ -n "$(git branch -a | grep -E "^.* $branch$")" ]]
 }
 
 HasAnyChanges()
@@ -157,7 +195,7 @@ TruncateToWidth()
   [ ${truncate_len} -lt ${min_len} -o ${truncate_len} -gt ${max_len} ] && truncate_len=0
   local truncate_msg=${truncate_msg:0:truncate_len}
 
-# (>&2 echo "(login_host=${#login_host}) + (current_dir=${#current_dir}) + (status_msg=${#status_msg}) = (prompt_len=$prompt_len)")
+# (>&2 echo "(login_host_len=${#login_host}) + (current_dir_len=${#current_dir}) + (status_msg_len=${#status_msg}) = (prompt_len=$prompt_len)")
 # (>&2 echo "(current_tty_w=$current_tty_w) - (prompt_mod=$prompt_mod) = (truncate_len=$truncate_len)")
 # (>&2 echo 123456789_123456789_123456789_123456789_123456789_123456789_123456789_123456789_123456789_123456789_....)
 
@@ -169,7 +207,7 @@ GitStatus()
 # (>&2 echo "AssertIsValidRepo=$(    AssertIsValidRepo     && echo 'true' || echo 'false - bailing')")
 # (>&2 echo "AssertIsNotBareRepo=$(  AssertIsNotBareRepo   && echo 'true' || echo 'false - bailing')")
 # (>&2 echo "AssertHasCommits=$(     AssertHasCommits      && echo 'true' || echo 'false - bailing')")
-# (>&2 echo "AssertIsNotIgnoredDir=$(AssertIsNotIgnoredDir && echo 'true' || echo 'false - bailing')")
+# (>&2 echo "AssertIsNotIgnoredDir=$(AssertIsNotIgnoredDir && echo 'true' || echo 'false'          )")
 
   # ensure we are in a valid, non-bare git repository, with commits, and not blacklisted
   ! AssertIsValidRepo                                                  && return
@@ -177,89 +215,80 @@ GitStatus()
   ! AssertHasCommits      && echo $(TruncateToWidth "" "(no commits)") && return
   ! AssertIsNotIgnoredDir && echo $(TruncateToWidth "" "(heavy-git)" ) && return
 
-  # get the current state
-  local git_dir=$(       git rev-parse --show-toplevel  )/.git ; [ "${git_dir}"        ] || return ;
-  local current_branch=$(git rev-parse --abbrev-ref HEAD)      ; [ "${current_branch}" ] || return ;
+  # get current state
+  local git_dir="$(      GitDir                                      )"
+  local current_branch=$(CurrentBranch                               )
+  local detached_msg="$( DetachedMsg "${git_dir}" "${current_branch}")"
 
-  # detect detached HEAD state and abort
-  if   [ -f "${git_dir}/MERGE_HEAD" ] && [ ! -z "$(cat ${git_dir}/MERGE_MSG | grep -E '^Merge')" ]
-  then local merge_msg=$(cat ${git_dir}/MERGE_MSG | grep -E "^Merge (.*)(branch|tag|commit) '"                             | \
-                         sed -e "s/^Merge \(.*\)\(branch\|tag\|commit\) '\(.*\)' \(of .* \)\?\(into .*\)\?$/\1 \2 \3 \4\5/")
+# (>&2 echo "is_valid_git_dir=$(       [[ -n "${git_dir}"        ]]    && echo 'true' || echo 'false - bailing')")
+# (>&2 echo "is_valid_current_branch=$([[ -n "${current_branch}" ]]    && echo 'true' || echo 'false - bailing')")
+# (>&2 echo "is_detached=$(            [[ -n "${detached_msg}"   ]]    && echo 'true' || echo 'false'          )")
+# (>&2 echo "is_local_branch=$(        IsLocalBranch ${current_branch} && echo 'true' || echo 'false - bailing')")
 
-       echo ${UNTRACKED_COLOR}$(TruncateToWidth "" "(merging $merge_msg)")${CEND} ; return ;
+  # validate current state
+  [[ -n "${git_dir}" && -n "${current_branch}" ]]                           || return
+  [[ -n "${detached_msg}"                      ]] && echo "${detached_msg}" && return
+  IsLocalBranch ${current_branch}                                           || return
 
-  elif [ -d "${git_dir}/rebase-apply/" ] || [ -d "${git_dir}/rebase-merge/" ]
-  then local rebase_dir=$(  ls -d ${git_dir}/rebase-* | sed -e "s/^\$\(git_dir\)\/rebase-\(.*\)$/\$\(git_dir\)\/rebase-\1/")
-       local this_branch=$( cat ${rebase_dir}/head-name | sed -e "s/^refs\/heads\/\(.*\)$/\1/" )
-       local their_commit=$(cat ${rebase_dir}/onto                                             )
-       local at_commit=$(   git log -n1 --oneline $(cat ${rebase_dir}/stopped-sha 2> /dev/null))
-       local msg="(rebasing ${this_branch} onto ${their_commit::7} - at ${at_commit})"
-
-       echo ${UNTRACKED_COLOR}$(TruncateToWidth "" "${msg}" )${CEND} ; return ;
-
-  elif [ "${current_branch}" == "HEAD" ]
-  then echo ${UNTRACKED_COLOR}$(TruncateToWidth "" "(detached)")${CEND} ; return ;
-  fi
-
-  # loop over all branches to find remote tracking branch
+  # get remote tracking branch
   local local_branch
   local remote_branch
+  local should_count_divergences
   while read local_branch remote_branch
-  do
-    # filter branches by name
-    [ "${current_branch}" != "${local_branch}" ] && continue
-
-    # set branch color based on dirty status
-    local branch_color=$([ -z "$(HasAnyChanges)" ] && echo ${CLEAN_COLOR} || echo ${DIRTY_COLOR})
-
-    # get sync status
-    if [ ${remote_branch} ] ; then
-      local status=$(SyncStatus ${local_branch} ${remote_branch})
-      local n_behind=$(echo "${status}" | tr " " "\n" | grep -c '^>')
-      local n_ahead=$( echo "${status}" | tr " " "\n" | grep -c '^<')
-
-      # set sync color
-      local behind_color=$([ "$n_behind" -ne 0 ] && echo ${BEHIND_COLOR} || echo ${EVEN_COLOR})
-      local ahead_color=$( [ "$n_ahead"  -ne 0 ] && echo ${AHEAD_COLOR}  || echo ${EVEN_COLOR})
-    fi
-
-    # get tracked status
-    local tracked=$(HasTrackedChanges)
-
-    # get untracked status
-    local untracked=$(HasUntrackedChanges)
-
-    # get staged status
-    local staged=$(HasStagedChanges)
-
-    # get stashed status
-    local stashed=$(HasStashedChanges)
-
-    # build output
-    local open_paren="${branch_color}(${CEND}"
-    local close_paren="${branch_color})${CEND}"
-    local open_bracket="${branch_color}[${CEND}"
-    local close_bracket="${branch_color}]${CEND}"
-    local tracked_msg=${TRACKED_COLOR}${tracked}${CEND}
-    local untracked_msg=${UNTRACKED_COLOR}${untracked}${CEND}
-    local staged_msg=${STAGED_COLOR}${staged}${CEND}
-    local stashed_msg=${STASHED_COLOR}${stashed}${CEND}
-    local branch_msg=${branch_color}${current_branch}${CEND}
-    local status_msg=${stashed_msg}${untracked_msg}${tracked_msg}${staged_msg}
-    local behind_msg=$(  [ $remote_branch ] && echo "${behind_color}${n_behind}<-${CEND}"                     )
-    local ahead_msg=$(   [ $remote_branch ] && echo "${ahead_color}->${n_ahead}${CEND}"                       )
-    local upstream_msg=$([ $remote_branch ] && echo "${open_bracket}${behind_msg}${ahead_msg}${close_bracket}")
-    local branch_status_msg="${open_paren}${branch_msg}${status_msg}${upstream_msg}${close_paren}"
-
-    # append last commit message
-    local author_date=$(git log --max-count=1 --format=format:"%ai" 2> /dev/null       )
-    local commit_log=$( git log --max-count=1 --format=format:\"%s\" | sed -r "s/\"//g")
-    [ "${commit_log}" ] || commit_log='<EMPTY>'
-    local commit_msg=" ${author_date:0:TIMESTAMP_LEN} ${commit_log}"
-
-    echo $(TruncateToWidth "${branch_status_msg}" "${commit_msg}")
-
+  do    [[ "${current_branch}" == "${local_branch}" ]]                              && \
+        should_count_divergences=$([[ -n "${remote_branch}" ]] && echo 1 || echo 0) && \
+        break
   done < <(git for-each-ref --format="%(refname:short) %(upstream:short)" refs/heads)
+
+  # set branch color based on dirty status
+  local branch_color=$([ -z "$(HasAnyChanges)" ] && echo ${CLEAN_COLOR} || echo ${DIRTY_COLOR})
+
+  # get sync status
+  if   (( ${should_count_divergences} ))
+  then local status=$(      SyncStatus ${current_branch} ${remote_branch}                        )
+       local n_behind=$(    echo "${status}" | tr " " "\n" | grep -c '^>'                        )
+       local n_ahead=$(     echo "${status}" | tr " " "\n" | grep -c '^<'                        )
+       local behind_color=$([ "${n_behind}" -ne 0 ] && echo ${BEHIND_COLOR} || echo ${EVEN_COLOR})
+       local ahead_color=$( [ "${n_ahead}"  -ne 0 ] && echo ${AHEAD_COLOR}  || echo ${EVEN_COLOR})
+  fi
+
+  # get tracked status
+  local tracked=$(HasTrackedChanges)
+
+  # get untracked status
+  local untracked=$(HasUntrackedChanges)
+
+  # get staged status
+  local staged=$(HasStagedChanges)
+
+  # get stashed status
+  local stashed=$(HasStashedChanges)
+
+  # build output
+  local open_paren="${branch_color}(${CEND}"
+  local close_paren="${branch_color})${CEND}"
+  local open_bracket="${branch_color}[${CEND}"
+  local close_bracket="${branch_color}]${CEND}"
+  local tracked_msg=${TRACKED_COLOR}${tracked}${CEND}
+  local untracked_msg=${UNTRACKED_COLOR}${untracked}${CEND}
+  local staged_msg=${STAGED_COLOR}${staged}${CEND}
+  local stashed_msg=${STASHED_COLOR}${stashed}${CEND}
+  local branch_msg=${branch_color}${current_branch}${CEND}
+  local status_msg=${stashed_msg}${untracked_msg}${tracked_msg}${staged_msg}
+  if   (( ${should_count_divergences} ))
+  then local behind_msg="${behind_color}${n_behind}<-${CEND}"
+       local ahead_msg="${ahead_color}->${n_ahead}${CEND}"
+       local upstream_msg="${open_bracket}${behind_msg}${ahead_msg}${close_bracket}"
+  fi
+  local branch_status_msg="${open_paren}${branch_msg}${status_msg}${upstream_msg}${close_paren}"
+
+  # append last commit message
+  local author_date=$(git log --max-count=1 --format=format:"%ai" 2> /dev/null       )
+  local commit_log=$( git log --max-count=1 --format=format:\"%s\" | sed -r "s/\"//g")
+  [[ -n "${commit_log}" ]] || commit_log='<EMPTY>'
+  local commit_msg=" ${author_date:0:TIMESTAMP_LEN} ${commit_log}"
+
+  echo $(TruncateToWidth "${branch_status_msg}" "${commit_msg}")
 }
 
 
