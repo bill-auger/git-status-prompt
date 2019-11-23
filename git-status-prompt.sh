@@ -61,7 +61,7 @@ readonly EVEN_COLOR=${GREEN}
 readonly ROOT_COLOR=${RED}
 readonly USER_COLOR=${PURPLE}
 readonly LOGIN=$(whoami)
-readonly ANSI_FILTER_REGEX="s/\\\033\[([0-9]{1,2}(;[0-9]{1,2})?)?m//g"
+readonly ANSI_FILTER_REGEX="s|\\\033\[([0-9]{1,2}(;[0-9]{1,2})?)?m||g"
 readonly TIMESTAMP_LEN=10
 
 
@@ -113,17 +113,6 @@ DbgSourced() { Dbg "sourced" ; }
 
 ## helpers ##
 
-AssertIsNotIgnoredDir()
-{
-  local ignored_dir
-
-  for  ignored_dir in ${IGNORED_DIRS[*]}
-  do   [[ "$(pwd)" =~ ^${ignored_dir} ]] && return 1
-  done
-
-  return 0
-}
-
 AssertIsValidRepo()
 {
   [[ "$(git rev-parse --is-inside-work-tree 2> /dev/null)" == 'true' ]] || \
@@ -141,6 +130,17 @@ AssertHasCommits()
   [[ -n "$(git cat-file -t HEAD 2> /dev/null)" ]]
 }
 
+AssertIsNotIgnoredDir()
+{
+  local ignored_dir
+
+  for  ignored_dir in ${IGNORED_DIRS[*]}
+  do   [[ "$(pwd)" =~ ^${ignored_dir} ]] && return 1
+  done
+
+  return 0
+}
+
 GitDir() { echo "$(git rev-parse --show-toplevel  )/.git" ; }
 
 CurrentBranch() { git rev-parse --abbrev-ref HEAD ; }
@@ -153,14 +153,14 @@ DetachedMsg() # (git_dir current_branch)
   [[ -n "${git_dir}" ]] || return ;
 
   if   [[ -f "${git_dir}/MERGE_HEAD" && ! -z "$(cat ${git_dir}/MERGE_MSG | grep -E '^Merge')" ]]
-  then local merge_msg=$(cat ${git_dir}/MERGE_MSG | grep -E "^Merge (.*)(branch|tag|commit) '"                             | \
-                         sed -e "s/^Merge \(.*\)\(branch\|tag\|commit\) '\(.*\)' \(of .* \)\?\(into .*\)\?$/\1 \2 \3 \4\5/")
+  then local merge_msg=$(cat ${git_dir}/MERGE_MSG | grep -E "^Merge (.*)(branch|tag|commit) '"                            | \
+                         sed -e "s/^Merge \(.*\)\(branch\|tag\|commit\) '\(.*\)' \(of .* \)\?\(into .*\)\?$/\1\2 \3 \4\5/")
 
        echo "${UNTRACKED_COLOR}$(TruncateToWidth "" "(merging ${merge_msg})")${CEND}"
 
   elif [[ -d "${git_dir}/rebase-apply/" || -d "${git_dir}/rebase-merge/" ]]
-  then local rebase_dir=$(  ls -d ${git_dir}/rebase-* | sed -e "s/^\$\(git_dir\)\/rebase-\(.*\)$/\$\(git_dir\)\/rebase-\1/")
-       local this_branch=$( cat ${rebase_dir}/head-name | sed -e "s/^refs\/heads\/\(.*\)$/\1/" )
+  then local rebase_dir=$(  ls -d ${git_dir}/rebase-* | sed -e "s|^\$\(git_dir\)/rebase-\(.*\)$|\$\(git_dir\)/rebase-\1|")
+       local this_branch=$( cat ${rebase_dir}/head-name | sed -e "s|^refs/heads/\(.*\)$|\1|" )
        local their_commit=$(cat ${rebase_dir}/onto                                             )
        local at_commit=$(   git log -n1 --oneline $(cat ${rebase_dir}/stopped-sha 2> /dev/null))
        local msg="(rebasing ${this_branch} onto ${their_commit::7} - at ${at_commit})"
@@ -204,7 +204,7 @@ HasStashedChanges()
   git rev-parse --verify refs/stash > /dev/null 2>&1 && echo "${STASHED_CHAR}"
 }
 
-SyncStatus()
+SyncStatus() # (local_branch remote_branch status)
 {
   local local_branch=$1
   local remote_branch=$2
@@ -250,7 +250,7 @@ DbgGitStatusState()
   (>&2 echo "is_local_branch=$(        IsLocalBranch ${current_branch} && echo 'true' || echo 'false - bailing')")
 }
 
-TruncateToWidth()
+TruncateToWidth() # (fixed_len_msg truncate_msg)
 {
   local fixed_len_msg=$1
   local truncate_msg=$2
@@ -351,7 +351,7 @@ GitStatus()
 
   # append last commit message
   local author_date=$(git log --max-count=1 --format=format:"%ai" 2> /dev/null       )
-  local commit_log=$( git log --max-count=1 --format=format:\"%s\" | sed -r "s/\"//g")
+  local commit_log=$( git log --max-count=1 --format=format:\"%s\" | sed -r "s|\"||g")
   [[ -n "${commit_log}" ]] || commit_log='<EMPTY>'
   local commit_msg=" ${author_date:0:TIMESTAMP_LEN} ${commit_log}"
 
