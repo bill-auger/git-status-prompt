@@ -40,8 +40,9 @@ readonly YELLOW='\033[01;33m'
 readonly GREEN='\033[00;32m'
 readonly LIME='\033[01;32m'
 readonly PURPLE='\033[00;35m'
-readonly BLUE='\033[00;36m'
-readonly AQUA='\033[01;36m'
+readonly BLUE='\033[00;34m'
+readonly AQUA='\033[00;36m'
+readonly CYAN='\033[01;36m'
 readonly CEND='\033[00m'
 readonly DIRTY_CHAR="*"
 readonly TRACKED_CHAR="!"
@@ -49,6 +50,10 @@ readonly UNTRACKED_CHAR="?"
 readonly STAGED_CHAR="+"
 readonly STASHED_CHAR="$"
 readonly GIT_CLEAN_MSG_REGEX="nothing to commit,? (?working directory clean)?"
+readonly ROOT_COLOR=${RED}
+readonly USER_COLOR=${PURPLE}
+readonly PWD_COLOR=${BLUE}
+readonly GIT_COLOR=''
 readonly CLEAN_COLOR=${GREEN}
 readonly DIRTY_COLOR=${YELLOW}
 readonly TRACKED_COLOR=${YELLOW}
@@ -58,8 +63,7 @@ readonly STASHED_COLOR=${LIME}
 readonly BEHIND_COLOR=${RED}
 readonly AHEAD_COLOR=${YELLOW}
 readonly EVEN_COLOR=${GREEN}
-readonly ROOT_COLOR=${RED}
-readonly USER_COLOR=${PURPLE}
+readonly DATE_COLOR=${AQUA}
 readonly LOGIN=$(whoami)
 readonly ANSI_FILTER_REGEX="s|\\\033\[([0-9]{1,2}(;[0-9]{1,2})?)?m||g"
 readonly TIMESTAMP_LEN=10
@@ -69,13 +73,9 @@ readonly TIMESTAMP_LEN=10
 
 Dbg() { (>&2 echo -e "[GitStatusPrompt]: $@") ; }
 
-DbgTruncateToWidth() # (login_host_len current_dir_len status_msg_len prompt_len current_tty_w prompt_mod truncate_len min_len max_len)
+DbgTruncateToWidth()
 {
-  local login_host_len=$1 ; local current_dir_len=$2 ; local status_msg_len=$3 ; local prompt_len=$4 ;
-  local current_tty_w=$5  ; local prompt_mod=$6      ; local truncate_len=$7   ;
-  local min_len=$8        ; local max_len=$9         ;
-
-  Dbg "(login_host_len=${#login_host_len}) + (current_dir_len=${#current_dir_len}) + (status_msg_len=${#status_msg_len}) = (prompt_len=$prompt_len)"
+  Dbg "(login_host_len=${#1}) + (current_dir_len=${#2}) + (status_msg_len=${#3}) = (prompt_len=$prompt_len)"
   Dbg "(current_tty_w=$current_tty_w) - (prompt_mod=$prompt_mod) = (truncate_len=$truncate_len)"
   Dbg "(min_len=$min_len) < (truncate_len=$truncate_len) < (max_len=$max_len)"
   Dbg 123456789_123456789_123456789_123456789_123456789_123456789_123456789_123456789_123456789_123456789_....
@@ -223,54 +223,26 @@ LoginHost()
 
 CurrentDir() { local pwd="${PWD}/" ; echo "${pwd/\/\//\/}" ; }
 
-DbgTruncateToWidth()
+TruncateToWidth() # (fixed_len_prefix truncate_msg)
 {
-  (>&2 echo "(login_host_len=${#1}) + (current_dir_len=${#2}) + (status_msg_len=${#3}) = (prompt_len=$prompt_len)")
-  (>&2 echo "(current_tty_w=$current_tty_w) - (prompt_mod=$prompt_mod) = (truncate_len=$truncate_len)")
-  (>&2 echo "(min_len=$min_len) < (truncate_len=$truncate_len) < (max_len=$max_len)")
-  (>&2 echo 123456789_123456789_123456789_123456789_123456789_123456789_123456789_123456789_123456789_123456789_....)
-}
-
-DbgGitStatusAssertions()
-{
-  (>&2 echo "AssertIsValidRepo=$(    AssertIsValidRepo     && echo 'true' || echo 'false - bailing')")
-  (>&2 echo "AssertIsNotBareRepo=$(  AssertIsNotBareRepo   && echo 'true' || echo 'false - bailing')")
-  (>&2 echo "AssertHasCommits=$(     AssertHasCommits      && echo 'true' || echo 'false - bailing')")
-  (>&2 echo "AssertIsNotIgnoredDir=$(AssertIsNotIgnoredDir && echo 'true' || echo 'false'          )")
-}
-
-DbgGitStatusState()
-{
-  local git_dir=$1 ; local current_branch=$2 ; local detached_msg=$3 ;
-
-  (>&2 echo "current_branch=${current_branch}")
-  (>&2 echo "is_valid_git_dir=$(       [[ -n "${git_dir}"        ]]    && echo 'true' || echo 'false - bailing')")
-  (>&2 echo "is_valid_current_branch=$([[ -n "${current_branch}" ]]    && echo 'true' || echo 'false - bailing')")
-  (>&2 echo "is_detached=$(            [[ -n "${detached_msg}"   ]]    && echo 'true' || echo 'false'          )")
-  (>&2 echo "is_local_branch=$(        IsLocalBranch ${current_branch} && echo 'true' || echo 'false - bailing')")
-}
-
-TruncateToWidth() # (fixed_len_msg truncate_msg)
-{
-  local fixed_len_msg=$1
+  local fixed_len_prefix=$( [[ "$1" ]] && echo "$1 " )
   local truncate_msg=$2
 
   # trunctuate to console width
-  local login_host=$( echo $(LoginHost)   | sed -r ${ANSI_FILTER_REGEX} --)
+  local login_host=$( echo $(LoginHost)          | sed -r ${ANSI_FILTER_REGEX} --)
   local current_dir=$(CurrentDir                                          )
-  local status_msg=$( echo $fixed_len_msg | sed -r ${ANSI_FILTER_REGEX} --)
+  local status_msg=$( echo "${fixed_len_prefix}" | sed -r ${ANSI_FILTER_REGEX} --)
   local current_tty_w=$(( $(stty -F /dev/tty size | cut -d ' ' -f2)         ))
   local prompt_len=$((    ${#login_host} + ${#current_dir} + ${#status_msg} ))
   local prompt_mod=$((    ${prompt_len} % ${current_tty_w}                  ))
   local truncate_len=$((  ${current_tty_w} - ${prompt_mod}                  ))
-  local min_len=$(( ${TIMESTAMP_LEN} + 1 ))
-  local max_len=$(( ${current_tty_w} - 1 ))
+  local min_len=${TIMESTAMP_LEN}
+  local max_len=${current_tty_w}
   [ ${truncate_len} -lt ${min_len} -o ${truncate_len} -gt ${max_len} ] && truncate_len=0
-  local truncate_msg=${truncate_msg:0:truncate_len}
 
 # DbgTruncateToWidth
 
-  echo "${fixed_len_msg}${truncate_msg}"
+  echo "${truncate_msg:0:truncate_len}"
 }
 
 GitStatus()
@@ -353,9 +325,11 @@ GitStatus()
   local author_date=$(git log --max-count=1 --format=format:"%ai" 2> /dev/null       )
   local commit_log=$( git log --max-count=1 --format=format:\"%s\" | sed -r "s|\"||g")
   [[ -n "${commit_log}" ]] || commit_log='<EMPTY>'
-  local commit_msg=" ${author_date:0:TIMESTAMP_LEN} ${commit_log}"
+  local commit_msg="${author_date:0:TIMESTAMP_LEN} ${commit_log}"
+  commit_msg="$(TruncateToWidth "${branch_status_msg}" "${commit_msg}")"
+  commit_msg="${DATE_COLOR}${commit_msg:0:TIMESTAMP_LEN}${CEND} ${commit_msg:(TIMESTAMP_LEN + 1)}"
 
-  echo $(TruncateToWidth "${branch_status_msg}" "${commit_msg}")
+  echo "${branch_status_msg} ${commit_msg}"
 }
 
 
@@ -364,8 +338,8 @@ GitStatus()
 GitStatusPrompt()
 {
   local login_host="$(LoginColor)$(LoginHost)${CEND}"
-  local pwd_path="${BLUE}$(CurrentDir)${CEND}"
-  local git_status="${GREEN}$(GitStatus)${CEND}"
+  local pwd_path="${PWD_COLOR}$(CurrentDir)${CEND}"
+  local git_status="$(GitStatus)"
   local prompt_tail='\n$ '
 
 # DbgGitStatusPrompt
