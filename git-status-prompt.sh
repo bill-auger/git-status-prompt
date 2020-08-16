@@ -56,6 +56,7 @@ readonly USER_COLOR=${PURPLE}
 readonly PWD_COLOR=${AQUA}
 readonly CLEAN_COLOR=${GREEN}
 readonly DIRTY_COLOR=${YELLOW}
+readonly UNO_COLOR=${LIME}
 readonly TRACKED_COLOR=${YELLOW}
 readonly UNTRACKED_COLOR=${RED}
 readonly STAGED_COLOR=${GREEN}
@@ -291,7 +292,9 @@ GitStatus()
   done < <(git for-each-ref --format="%(refname:short) %(upstream:short)" refs/heads)
 
   # set branch color based on dirty status
-  local branch_color=$( [[ -z "$(HasAnyChanges)" ]] && echo ${CLEAN_COLOR} || echo ${DIRTY_COLOR} )
+  local branch_color=$( ( HasTrackedChanges && echo -n ${DIRTY_COLOR} ) ||
+                        ( HasAnyChanges     && echo -n ${UNO_COLOR}   ) ||
+                                               echo -n ${CLEAN_COLOR}    )
 
   # get sync status
   if   (( ${should_count_divergences} ))
