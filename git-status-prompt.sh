@@ -33,7 +33,8 @@
 
 
 # this script can be sluggish in very large repos
-declare -r -a IGNORED_DIRS=( $(grep -v ^# "$(dirname ${BASH_SOURCE})/ignore_dirs" 2> /dev/null) )
+CFG_IGNORED_DIRS=( $(grep -v ^# "$(dirname ${BASH_SOURCE})/ignore_dirs" 2> /dev/null) )
+
 
 readonly RED='\033[1;31m'
 readonly YELLOW='\033[01;33m'
@@ -134,8 +135,8 @@ AssertIsNotIgnoredDir()
 {
   local ignored_dir
 
-  for  ignored_dir in ${IGNORED_DIRS[*]}
-  do   [[ "$(pwd)" =~ ^${ignored_dir} ]] && return 1
+  for  ignored_dir in ${CFG_IGNORED_DIRS[@]} ${GSP_IGNORED_DIRS[@]}
+  do   [[ "$(pwd)/" =~ ^${ignored_dir} ]] && return 1
   done
 
   return 0
@@ -245,15 +246,12 @@ TruncateToWidth() # (fixed_len_prefix truncate_msg)
   echo "${truncate_msg:0:truncate_len}"
 }
 
+
+## business ##
+
 GitStatus()
 {
 # DbgGitStatusAssertions
-
-  # ensure we are in a valid, non-bare git repository, with commits, and not blacklisted
-  ! AssertIsValidRepo                                                  && return
-  ! AssertIsNotBareRepo   && echo $(TruncateToWidth "" "(bare repo)" ) && return
-  ! AssertHasCommits      && echo $(TruncateToWidth "" "(no commits)") && return
-  ! AssertIsNotIgnoredDir && echo $(TruncateToWidth "" "(heavy-git)" ) && return
 
   # get current state
   local git_dir="$(      GitDir                                      )"
@@ -266,6 +264,12 @@ GitStatus()
   [[ -n "${git_dir}" && -n "${current_branch}" ]]                           || return
   [[ -n "${detached_msg}"                      ]] && echo "${detached_msg}" && return
   IsLocalBranch ${current_branch}                                           || return
+
+  # ensure we are in a valid, non-bare git repository, with commits, and not blacklisted
+  ! AssertIsValidRepo                                                           && return
+  ! AssertIsNotBareRepo   && echo "$(TruncateToWidth "" "(bare repo)"        )" && return
+  ! AssertHasCommits      && echo "$(TruncateToWidth "" "(no commits)"       )" && return
+  ! AssertIsNotIgnoredDir && echo "$(TruncateToWidth "" "(${current_branch})")" && return
 
   # get remote tracking branch
   local local_branch
