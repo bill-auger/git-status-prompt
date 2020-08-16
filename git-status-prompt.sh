@@ -181,28 +181,38 @@ IsLocalBranch() # (branch_name)
 
 HasAnyChanges()
 {
-  [[ "$(git status 2> /dev/null | tail -n1 | grep -E "${GIT_CLEAN_MSG_REGEX}")" ]] || echo "${DIRTY_CHAR}"
+  ! [[ "$(git status 2> /dev/null | tail -n1 | grep -E "${GIT_CLEAN_MSG_REGEX}")" ]]
 }
 
 HasTrackedChanges()
 {
-  git diff --no-ext-diff --quiet --exit-code || echo "${TRACKED_CHAR}"
+  ! git diff --no-ext-diff --quiet --exit-code
 }
 
 HasUntrackedChanges()
 {
-  [[ -n "$(git ls-files --others --exclude-standard 2> /dev/null)" ]] && echo "${UNTRACKED_CHAR}"
+  [[ -n "$(git ls-files --others --exclude-standard 2> /dev/null)" ]]
 }
 
 HasStagedChanges()
 {
-  git diff-index --cached --quiet HEAD -- || echo "${STAGED_CHAR}"
+  ! git diff-index --cached --quiet HEAD --
 }
 
 HasStashedChanges()
 {
-  git rev-parse --verify refs/stash > /dev/null 2>&1 && echo "${STASHED_CHAR}"
+  git rev-parse --verify refs/stash > /dev/null 2>&1
 }
+
+AnyChanges()       { HasAnyChanges       && echo -n "${DIRTY_CHAR}"     ; }
+
+TrackedChanges()   { HasTrackedChanges   && echo -n "${TRACKED_CHAR}"   ; }
+
+UntrackedChanges() { HasUntrackedChanges && echo -n "${UNTRACKED_CHAR}" ; }
+
+StagedChanges()    { HasStagedChanges    && echo -n "${STAGED_CHAR}"    ; }
+
+StashedChanges()   { HasStashedChanges   && echo -n "${STASHED_CHAR}"   ; }
 
 SyncStatus() # (local_branch remote_branch status)
 {
@@ -293,16 +303,16 @@ GitStatus()
   fi
 
   # get tracked status
-  local tracked=$(HasTrackedChanges)
+  local tracked=$(TrackedChanges)
 
   # get untracked status
-  local untracked=$(HasUntrackedChanges)
+  local untracked=$(UntrackedChanges)
 
   # get staged status
-  local staged=$(HasStagedChanges)
+  local staged=$(StagedChanges)
 
   # get stashed status
-  local stashed=$(HasStashedChanges)
+  local stashed=$(StashedChanges)
 
 # DbgGitStatusChars
 
