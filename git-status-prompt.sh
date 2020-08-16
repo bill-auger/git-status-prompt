@@ -53,8 +53,7 @@ readonly STASHED_CHAR="$"
 readonly GIT_CLEAN_MSG_REGEX="nothing to commit,? (?working directory clean)?"
 readonly ROOT_COLOR=${RED}
 readonly USER_COLOR=${PURPLE}
-readonly PWD_COLOR=${BLUE}
-readonly GIT_COLOR=''
+readonly PWD_COLOR=${AQUA}
 readonly CLEAN_COLOR=${GREEN}
 readonly DIRTY_COLOR=${YELLOW}
 readonly TRACKED_COLOR=${YELLOW}
@@ -64,7 +63,7 @@ readonly STASHED_COLOR=${LIME}
 readonly BEHIND_COLOR=${RED}
 readonly AHEAD_COLOR=${YELLOW}
 readonly EVEN_COLOR=${GREEN}
-readonly DATE_COLOR=${AQUA}
+readonly DATE_COLOR=${BLUE}
 readonly LOGIN=$(whoami)
 readonly ANSI_FILTER_REGEX="s|\\\033\[([0-9]{1,2}(;[0-9]{1,2})?)?m||g"
 readonly TIMESTAMP_LEN=10
@@ -142,16 +141,16 @@ AssertIsNotIgnoredDir()
   return 0
 }
 
-GitDir() { echo "$(git rev-parse --show-toplevel  )/.git" ; }
+GitDir() { echo "$(git rev-parse --show-toplevel 2> /dev/null)/.git" ; }
 
-CurrentBranch() { git rev-parse --abbrev-ref HEAD ; }
+CurrentBranch() { git rev-parse --abbrev-ref HEAD 2> /dev/null ; }
 
 DetachedMsg() # (git_dir current_branch)
 {
   local git_dir=$1
   local current_branch=$2
 
-  [[ -n "${git_dir}" ]] || return ;
+  [[ -n "${git_dir}" && -n "${current_branch}" ]] || return
 
   if   [[ -f "${git_dir}/MERGE_HEAD" && ! -z "$(cat ${git_dir}/MERGE_MSG | grep -E '^Merge')" ]]
   then local merge_msg=$(cat ${git_dir}/MERGE_MSG | grep -E "^Merge (.*)(branch|tag|commit) '"                            | \
@@ -177,12 +176,12 @@ IsLocalBranch() # (branch_name)
 {
   local branch=$1
 
-  [[ -n "$(git branch -a | grep -E "^.* $branch$")" ]]
+  [[ -n "$(git branch -a 2> /dev/null | grep -E "^.* $branch$")" ]]
 }
 
 HasAnyChanges()
 {
-  [ "$(git status 2> /dev/null | tail -n1 | grep -E "${GIT_CLEAN_MSG_REGEX}")" ] || echo "${DIRTY_CHAR}"
+  [[ "$(git status 2> /dev/null | tail -n1 | grep -E "${GIT_CLEAN_MSG_REGEX}")" ]] || echo "${DIRTY_CHAR}"
 }
 
 HasTrackedChanges()
@@ -192,7 +191,7 @@ HasTrackedChanges()
 
 HasUntrackedChanges()
 {
-  [ -n "$(git ls-files --others --exclude-standard)" ] && echo "${UNTRACKED_CHAR}"
+  [[ -n "$(git ls-files --others --exclude-standard 2> /dev/null)" ]] && echo "${UNTRACKED_CHAR}"
 }
 
 HasStagedChanges()
@@ -211,15 +210,15 @@ SyncStatus() # (local_branch remote_branch status)
   local remote_branch=$2
   local status=$(git rev-list --left-right ${local_branch}...${remote_branch} -- 2>/dev/null)
 
-  [ $(( $? )) -eq 0 ] && echo ${status}
+  [[ $(( $? )) -eq 0 ]] && echo ${status}
 }
 
 LoginColor() { (( ${EUID} )) && echo ${USER_COLOR} || echo ${ROOT_COLOR} ; }
 
 LoginHost()
 {
-  [ -z "${STY}" ] && echo "${USER}@${HOSTNAME}${CEND}:"   || \
-                     echo "[${USER}@${HOSTNAME}]${CEND}:" # GNU screen
+  [[ -z "${STY}" ]] && echo "${USER}@${HOSTNAME}${CEND}:"   || \
+                       echo "[${USER}@${HOSTNAME}]${CEND}:" # GNU screen
 }
 
 CurrentDir() { local pwd="${PWD}/" ; echo "${pwd/\/\//\/}" ; }
@@ -239,7 +238,7 @@ TruncateToWidth() # (fixed_len_prefix truncate_msg)
   local truncate_len=$((  ${current_tty_w} - ${prompt_mod}                  ))
   local min_len=${TIMESTAMP_LEN}
   local max_len=${current_tty_w}
-  [ ${truncate_len} -lt ${min_len} -o ${truncate_len} -gt ${max_len} ] && truncate_len=0
+  [[ ${truncate_len} -lt ${min_len} || ${truncate_len} -gt ${max_len} ]] && truncate_len=0
 
 # DbgTruncateToWidth
 
@@ -282,15 +281,15 @@ GitStatus()
   done < <(git for-each-ref --format="%(refname:short) %(upstream:short)" refs/heads)
 
   # set branch color based on dirty status
-  local branch_color=$([ -z "$(HasAnyChanges)" ] && echo ${CLEAN_COLOR} || echo ${DIRTY_COLOR})
+  local branch_color=$( [[ -z "$(HasAnyChanges)" ]] && echo ${CLEAN_COLOR} || echo ${DIRTY_COLOR} )
 
   # get sync status
   if   (( ${should_count_divergences} ))
-  then local status=$(      SyncStatus ${current_branch} ${remote_branch}                        )
-       local n_behind=$(    echo "${status}" | tr " " "\n" | grep -c '^>'                        )
-       local n_ahead=$(     echo "${status}" | tr " " "\n" | grep -c '^<'                        )
-       local behind_color=$([ "${n_behind}" -ne 0 ] && echo ${BEHIND_COLOR} || echo ${EVEN_COLOR})
-       local ahead_color=$( [ "${n_ahead}"  -ne 0 ] && echo ${AHEAD_COLOR}  || echo ${EVEN_COLOR})
+  then local status=$(       SyncStatus ${current_branch} ${remote_branch}                           )
+       local n_behind=$(     echo "${status}" | tr " " "\n" | grep -c '^>'                           )
+       local n_ahead=$(      echo "${status}" | tr " " "\n" | grep -c '^<'                           )
+       local behind_color=$( [[ "${n_behind}" -ne 0 ]] && echo ${BEHIND_COLOR} || echo ${EVEN_COLOR} )
+       local ahead_color=$(  [[ "${n_ahead}"  -ne 0 ]] && echo ${AHEAD_COLOR}  || echo ${EVEN_COLOR} )
   fi
 
   # get tracked status
@@ -337,7 +336,7 @@ GitStatus()
 }
 
 
-# main entry point
+## main entry ##
 
 GitStatusPrompt()
 {
