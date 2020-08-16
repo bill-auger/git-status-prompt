@@ -65,7 +65,53 @@ readonly ANSI_FILTER_REGEX="s/\\\033\[([0-9]{1,2}(;[0-9]{1,2})?)?m//g"
 readonly TIMESTAMP_LEN=10
 
 
-# helpers
+## debugging ##
+
+Dbg() { (>&2 echo -e "[GitStatusPrompt]: $@") ; }
+
+DbgTruncateToWidth() # (login_host_len current_dir_len status_msg_len prompt_len current_tty_w prompt_mod truncate_len min_len max_len)
+{
+  local login_host_len=$1 ; local current_dir_len=$2 ; local status_msg_len=$3 ; local prompt_len=$4 ;
+  local current_tty_w=$5  ; local prompt_mod=$6      ; local truncate_len=$7   ;
+  local min_len=$8        ; local max_len=$9         ;
+
+  Dbg "(login_host_len=${#login_host_len}) + (current_dir_len=${#current_dir_len}) + (status_msg_len=${#status_msg_len}) = (prompt_len=$prompt_len)"
+  Dbg "(current_tty_w=$current_tty_w) - (prompt_mod=$prompt_mod) = (truncate_len=$truncate_len)"
+  Dbg "(min_len=$min_len) < (truncate_len=$truncate_len) < (max_len=$max_len)"
+  Dbg 123456789_123456789_123456789_123456789_123456789_123456789_123456789_123456789_123456789_123456789_....
+}
+
+DbgGitStatusAssertions()
+{
+  Dbg "AssertIsValidRepo=$(    AssertIsValidRepo     && echo 'true' || echo 'false - bailing')"
+  Dbg "AssertIsNotBareRepo=$(  AssertIsNotBareRepo   && echo 'true' || echo 'false - bailing')"
+  Dbg "AssertHasCommits=$(     AssertHasCommits      && echo 'true' || echo 'false - bailing')"
+  Dbg "AssertIsNotIgnoredDir=$(AssertIsNotIgnoredDir && echo 'true' || echo 'false'          )"
+}
+
+DbgGitStatusState()
+{
+  Dbg "current_branch=${current_branch}"
+  Dbg "is_valid_git_dir=$(       [[ -n "${git_dir}"        ]]    && echo 'true' || echo 'false - bailing')"
+  Dbg "is_valid_current_branch=$([[ -n "${current_branch}" ]]    && echo 'true' || echo 'false - bailing')"
+  Dbg "is_detached=$(            [[ -n "${detached_msg}"   ]]    && echo 'true' || echo 'false'          )"
+  Dbg "is_local_branch=$(        IsLocalBranch ${current_branch} && echo 'true' || echo 'false - bailing')"
+}
+
+DbgGitStatusChars()
+{
+  Dbg "tracked=$tracked untracked=$untracked staged=$staged stashed=$stashed\n"
+}
+
+DbgGitStatusPrompt()
+{
+  Dbg "login_host=${login_host} pwd_path=${pwd_path} git_status=${git_status} prompt_tail=${prompt_tail}"
+}
+
+DbgSourced() { Dbg "sourced" ; }
+
+
+## helpers ##
 
 AssertIsNotIgnoredDir()
 {
@@ -177,6 +223,33 @@ LoginHost()
 
 CurrentDir() { local pwd="${PWD}/" ; echo "${pwd/\/\//\/}" ; }
 
+DbgTruncateToWidth()
+{
+  (>&2 echo "(login_host_len=${#1}) + (current_dir_len=${#2}) + (status_msg_len=${#3}) = (prompt_len=$prompt_len)")
+  (>&2 echo "(current_tty_w=$current_tty_w) - (prompt_mod=$prompt_mod) = (truncate_len=$truncate_len)")
+  (>&2 echo "(min_len=$min_len) < (truncate_len=$truncate_len) < (max_len=$max_len)")
+  (>&2 echo 123456789_123456789_123456789_123456789_123456789_123456789_123456789_123456789_123456789_123456789_....)
+}
+
+DbgGitStatusAssertions()
+{
+  (>&2 echo "AssertIsValidRepo=$(    AssertIsValidRepo     && echo 'true' || echo 'false - bailing')")
+  (>&2 echo "AssertIsNotBareRepo=$(  AssertIsNotBareRepo   && echo 'true' || echo 'false - bailing')")
+  (>&2 echo "AssertHasCommits=$(     AssertHasCommits      && echo 'true' || echo 'false - bailing')")
+  (>&2 echo "AssertIsNotIgnoredDir=$(AssertIsNotIgnoredDir && echo 'true' || echo 'false'          )")
+}
+
+DbgGitStatusState()
+{
+  local git_dir=$1 ; local current_branch=$2 ; local detached_msg=$3 ;
+
+  (>&2 echo "current_branch=${current_branch}")
+  (>&2 echo "is_valid_git_dir=$(       [[ -n "${git_dir}"        ]]    && echo 'true' || echo 'false - bailing')")
+  (>&2 echo "is_valid_current_branch=$([[ -n "${current_branch}" ]]    && echo 'true' || echo 'false - bailing')")
+  (>&2 echo "is_detached=$(            [[ -n "${detached_msg}"   ]]    && echo 'true' || echo 'false'          )")
+  (>&2 echo "is_local_branch=$(        IsLocalBranch ${current_branch} && echo 'true' || echo 'false - bailing')")
+}
+
 TruncateToWidth()
 {
   local fixed_len_msg=$1
@@ -195,19 +268,14 @@ TruncateToWidth()
   [ ${truncate_len} -lt ${min_len} -o ${truncate_len} -gt ${max_len} ] && truncate_len=0
   local truncate_msg=${truncate_msg:0:truncate_len}
 
-# (>&2 echo "(login_host_len=${#login_host}) + (current_dir_len=${#current_dir}) + (status_msg_len=${#status_msg}) = (prompt_len=$prompt_len)")
-# (>&2 echo "(current_tty_w=$current_tty_w) - (prompt_mod=$prompt_mod) = (truncate_len=$truncate_len)")
-# (>&2 echo 123456789_123456789_123456789_123456789_123456789_123456789_123456789_123456789_123456789_123456789_....)
+# DbgTruncateToWidth
 
   echo "${fixed_len_msg}${truncate_msg}"
 }
 
 GitStatus()
 {
-# (>&2 echo "AssertIsValidRepo=$(    AssertIsValidRepo     && echo 'true' || echo 'false - bailing')")
-# (>&2 echo "AssertIsNotBareRepo=$(  AssertIsNotBareRepo   && echo 'true' || echo 'false - bailing')")
-# (>&2 echo "AssertHasCommits=$(     AssertHasCommits      && echo 'true' || echo 'false - bailing')")
-# (>&2 echo "AssertIsNotIgnoredDir=$(AssertIsNotIgnoredDir && echo 'true' || echo 'false'          )")
+# DbgGitStatusAssertions
 
   # ensure we are in a valid, non-bare git repository, with commits, and not blacklisted
   ! AssertIsValidRepo                                                  && return
@@ -220,10 +288,7 @@ GitStatus()
   local current_branch=$(CurrentBranch                               )
   local detached_msg="$( DetachedMsg "${git_dir}" "${current_branch}")"
 
-# (>&2 echo "is_valid_git_dir=$(       [[ -n "${git_dir}"        ]]    && echo 'true' || echo 'false - bailing')")
-# (>&2 echo "is_valid_current_branch=$([[ -n "${current_branch}" ]]    && echo 'true' || echo 'false - bailing')")
-# (>&2 echo "is_detached=$(            [[ -n "${detached_msg}"   ]]    && echo 'true' || echo 'false'          )")
-# (>&2 echo "is_local_branch=$(        IsLocalBranch ${current_branch} && echo 'true' || echo 'false - bailing')")
+# DbgGitStatusState
 
   # validate current state
   [[ -n "${git_dir}" && -n "${current_branch}" ]]                           || return
@@ -264,6 +329,8 @@ GitStatus()
   # get stashed status
   local stashed=$(HasStashedChanges)
 
+# DbgGitStatusChars
+
   # build output
   local open_paren="${branch_color}(${CEND}"
   local close_paren="${branch_color})${CEND}"
@@ -301,5 +368,9 @@ GitStatusPrompt()
   local git_status="${GREEN}$(GitStatus)${CEND}"
   local prompt_tail='\n$ '
 
+# DbgGitStatusPrompt
+
   echo -e "${login_host}${pwd_path}${git_status}${prompt_tail}"
 }
+
+# DbgSourced
