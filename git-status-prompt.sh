@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # git-status-prompt.sh - pretty format git sync and dirty status for shell prompt
-# Copyright 2013-2019 bill-auger <http://github.com/bill-auger/git-status-prompt/issues>
+# Copyright 2013-2020, 2022 bill-auger <http://github.com/bill-auger/git-status-prompt/issues>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
@@ -96,6 +96,7 @@ DbgGitStatusState()
   Dbg "git_dir=${git_dir}"
   Dbg "is_valid_git_dir=$(       [[ -n "${git_dir}"        ]]    && echo 'true' || echo 'false - bailing')"
   Dbg "is_valid_current_branch=$([[ -n "${current_branch}" ]]    && echo 'true' || echo 'false - bailing')"
+  Dbg "is_unsafe=$(              [[ -n "${unsafe_msg}"     ]]    && echo 'true' || echo 'false'          )"
   Dbg "is_detached=$(            [[ -n "${detached_msg}"   ]]    && echo 'true' || echo 'false'          )"
   Dbg "is_local_branch=$(        IsLocalBranch ${current_branch} && echo 'true' || echo 'false - bailing')"
 }
@@ -146,6 +147,14 @@ AssertIsNotIgnoredDir()
 GitDir() { echo "$(git rev-parse --show-toplevel 2> /dev/null)/.git" ; }
 
 CurrentBranch() { git rev-parse --abbrev-ref HEAD 2> /dev/null ; }
+
+UnsafeMsg()
+{
+  local git_status="$(git status 2>&1 1>/dev/null | sed '/^$/d')"
+  local my_advice="\nor, simply white-list them all:\n\tgit config --global --add safe.directory *"
+
+  [[ "${git_status}" =~ ^'fatal: unsafe repository ' ]] && echo -e "${git_status}${my_advice}"
+}
 
 DetachedMsg() # (git_dir current_branch)
 {
@@ -265,6 +274,7 @@ GitStatus()
 # DbgGitStatusAssertions
 
   # get current state
+  local unsafe_msg="$(   UnsafeMsg                                   )"
   local git_dir="$(      GitDir                                      )"
   local current_branch=$(CurrentBranch                               )
   local detached_msg="$( DetachedMsg "${git_dir}" "${current_branch}")"
@@ -272,6 +282,7 @@ GitStatus()
 # DbgGitStatusState
 
   # validate current state
+  [[ -z "${unsafe_msg}"                        ]] || ! echo "${unsafe_msg}" >&2 || return
   [[ -n "${git_dir}" && -n "${current_branch}" ]]                               || return
   [[ -z "${detached_msg}"                      ]] || ! echo "${detached_msg}"   || return
   IsLocalBranch ${current_branch}                                               || return
