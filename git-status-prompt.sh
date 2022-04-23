@@ -93,6 +93,7 @@ DbgGitStatusAssertions()
 DbgGitStatusState()
 {
   Dbg "current_branch=${current_branch}"
+  Dbg "git_dir=${git_dir}"
   Dbg "is_valid_git_dir=$(       [[ -n "${git_dir}"        ]]    && echo 'true' || echo 'false - bailing')"
   Dbg "is_valid_current_branch=$([[ -n "${current_branch}" ]]    && echo 'true' || echo 'false - bailing')"
   Dbg "is_detached=$(            [[ -n "${detached_msg}"   ]]    && echo 'true' || echo 'false'          )"
@@ -271,15 +272,15 @@ GitStatus()
 # DbgGitStatusState
 
   # validate current state
-  [[ -n "${git_dir}" && -n "${current_branch}" ]]                           || return
-  [[ -n "${detached_msg}"                      ]] && echo "${detached_msg}" && return
-  IsLocalBranch ${current_branch}                                           || return
+  [[ -n "${git_dir}" && -n "${current_branch}" ]]                               || return
+  [[ -z "${detached_msg}"                      ]] || ! echo "${detached_msg}"   || return
+  IsLocalBranch ${current_branch}                                               || return
 
   # ensure we are in a valid, non-bare git repository, with commits, and not blacklisted
-  ! AssertIsValidRepo                                                           && return
-  ! AssertIsNotBareRepo   && echo "$(TruncateToWidth "" "(bare repo)"        )" && return
-  ! AssertHasCommits      && echo "$(TruncateToWidth "" "(no commits)"       )" && return
-  ! AssertIsNotIgnoredDir && echo "$(TruncateToWidth "" "(${current_branch})")" && return
+  AssertIsValidRepo                                                             || return
+  AssertIsNotBareRepo   || ! echo "$(TruncateToWidth "" "(bare repo)"        )" || return
+  AssertHasCommits      || ! echo "$(TruncateToWidth "" "(no commits)"       )" || return
+  AssertIsNotIgnoredDir || ! echo "$(TruncateToWidth "" "(${current_branch})")" || return
 
   # get remote tracking branch
   local local_branch
