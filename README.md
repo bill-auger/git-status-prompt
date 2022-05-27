@@ -20,4 +20,4 @@ USAGE:
 ```
 
 
-[scrot]:  http://bill-auger.github.io/git-status-prompt-scrot.png "git-status-prompt screenshot"
+[scrot]: data/git-status-prompt-scrot.png "git-status-prompt screenshot"
