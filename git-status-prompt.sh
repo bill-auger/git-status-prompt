@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # git-status-prompt.sh - pretty format git sync and dirty status for shell prompt
-# Copyright 2013-2020, 2022 bill-auger <http://github.com/bill-auger/git-status-prompt/issues>
+# Copyright 2013-2020, 2022-2023 bill-auger <http://github.com/bill-auger/git-status-prompt/issues>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
@@ -365,6 +365,12 @@ GitStatus()
 
 GitStatusPrompt()
 {
+  local status=$?
+  local ts="$(date +'%Y-%m-%d %T')"
+  declare -i elapsed=$(( $(date +%s --date="${ts}") - $(date +%s --date="$(cat ~/.GSP_TS)") ))
+  printf "${ts}" > ~/.GSP_TS # TODO: better way to store this?
+  local elapsed_msg="$(( elapsed / 60 ))m $(( elapsed % 60 ))s -> ${status}"
+  local date_time="${ts} ($( (( status )) && echo -e "${RED}${elapsed_msg}${CEND}" || echo ${elapsed_msg}))"
   local login_host="$(LoginColor)$(LoginHost)${CEND}"
   local pwd_path="${PWD_COLOR}$(CurrentDir)${CEND}"
   local git_status="$(GitStatus)"
@@ -372,7 +378,7 @@ GitStatusPrompt()
 
 # DbgGitStatusPrompt
 
-  echo -e "${login_host}${pwd_path}${git_status}${prompt_tail}"
+  echo -e "${date_time}\n${login_host}${pwd_path}${git_status}${prompt_tail}"
 }
 
 # DbgSourced
