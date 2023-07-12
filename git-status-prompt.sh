@@ -36,6 +36,7 @@
 CFG_IGNORED_DIRS=( $(grep -v ^# "$(dirname ${BASH_SOURCE})/ignore_dirs" 2> /dev/null) )
 
 
+readonly GBS_TS_FILE=~/.GSP_TS
 readonly RED='\033[1;31m'
 readonly YELLOW='\033[01;33m'
 readonly GREEN='\033[00;32m'
@@ -366,11 +367,16 @@ GitStatus()
 GitStatusPrompt()
 {
   local status=$?
-  local ts="$(date +'%Y-%m-%d %T')"
-  declare -i elapsed=$(( $(date +%s --date="${ts}") - $(date +%s --date="$(cat ~/.GSP_TS)") ))
-  printf "${ts}" > ~/.GSP_TS # TODO: better way to store this?
-  local elapsed_msg="$(( elapsed / 60 ))m $(( elapsed % 60 ))s -> ${status}"
-  local date_time="${ts} ($( (( status )) && echo -e "${RED}${elapsed_msg}${CEND}" || echo ${elapsed_msg}))"
+  local exit_color="$( (( ! status )) && echo "${GREEN}" || echo "${RED}" )"
+  local date_time="$(date +'%Y-%m-%d %T')"
+  local ts=$(date +%s --date="${date_time}")
+  local last_ts=$(cat "${GBS_TS_FILE}" 2> /dev/null)
+  printf "${ts}" > "${GBS_TS_FILE}" # TODO: better way to store this?
+  declare -i elapsed_t=$(( ts - last_ts ))
+  declare -i elapsed_h=$((  elapsed_t / 3600       ))
+  declare -i elapsed_m=$(( (elapsed_t / 60) % 3600 ))
+  declare -i elapsed_s=$((  elapsed_t % 60         ))
+  local elapsed="${elapsed_m}m ${elapsed_s}s"
   local login_host="$(LoginColor)$(LoginHost)${CEND}"
   local pwd_path="${PWD_COLOR}$(CurrentDir)${CEND}"
   local git_status="$(GitStatus)"
@@ -378,7 +384,8 @@ GitStatusPrompt()
 
 # DbgGitStatusPrompt
 
-  echo -e "${date_time}\n${login_host}${pwd_path}${git_status}${prompt_tail}"
+  echo -e "${exit_color}->[${status}]${CEND} ${date_time} (${elapsed})"
+  echo -e "${login_host}${pwd_path}${git_status}${prompt_tail}"
 }
 
 # DbgSourced
