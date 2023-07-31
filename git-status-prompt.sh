@@ -32,11 +32,13 @@
 #   PS1="\$(GitStatusPrompt)"
 
 
-# this script can be sluggish in very large repos
-CFG_IGNORED_DIRS=( $(grep -v ^# "$(dirname ${BASH_SOURCE})/ignore_dirs" 2> /dev/null) )
-
+## user-defined configuration ##
 
 readonly GBS_TS_FILE=~/.GSP_TS
+
+
+## constants ##
+
 readonly RED='\033[1;31m'
 readonly YELLOW='\033[01;33m'
 readonly GREEN='\033[00;32m'
@@ -69,6 +71,12 @@ readonly DATE_COLOR=${BLUE}
 readonly LOGIN=$(whoami)
 readonly ANSI_FILTER_REGEX="s|\\\033\[([0-9]{1,2}(;[0-9]{1,2})?)?m||g"
 readonly TIMESTAMP_LEN=10
+
+
+## runtime configuration ##
+
+# this script can be sluggish in very large repos
+CFG_IGNORED_DIRS=( $(grep -v ^# "$(dirname ${BASH_SOURCE})/ignore_dirs" 2> /dev/null) )
 
 
 ## debugging ##
